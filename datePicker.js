@@ -8,9 +8,12 @@
  * @param {Object} options Overide the config defaults if you want to.
  */
 function DatePicker(input, options) {
+
+    this.date = new Date();
     this.input  = input;
     this.config = {
         spacer: '/',
+        order: ['month', 'day', 'year'],
         year: {
             start: 2004,
             end: 2012,
@@ -36,21 +39,11 @@ function DatePicker(input, options) {
             '10': 'Nov',
             '11': 'Dec'
         },
-//            'January',
-//            'February',
-//            'March',
-//            'April',
-//            'May',
-//            'June',
-//            'July',
-//            'August',
-//            'September',
-//            'October',
-//            'November',
-//            'December'
-//        ],
         position: 'default',
-        where: 'top'
+        where: 'top',
+        currentDay : this.date.getDate(),
+        currentMonth : this.date.getMonth(),
+        currentYear  : this.date.getFullYear()
     }
     this.uniqueClass = 'dp_input_' + Math.floor(Math.random()*11);
     this.wrapper     = undefined;
@@ -167,7 +160,12 @@ DatePicker.prototype.build = {
 
         // Build year list
         for ( var i=start; i<(end + 1); i++ ) {
-            div.push('<li class="dp_year">' + i + '</li>');
+            if(i == that.config.currentYear){
+                div.push('<li class="dp_year dp_current">' + i + '</li>');
+            }
+            else {
+                div.push('<li class="dp_year">' + i + '</li>');
+            }
         }
         
         div.push('</ol>');
@@ -195,7 +193,12 @@ DatePicker.prototype.build = {
         
         for ( var month in months ) {
             if ( months.hasOwnProperty(month) ) {
-                div.push('<li class="dp_month" data-month="' + month + '">' + months[month] + '</li>');
+                if(month == that.config.currentMonth && that.config.selected.year == that.config.currentYear) {
+                    div.push('<li class="dp_month dp_current" data-month="' + month + '">' + months[month] + '</li>');
+                }
+                else {
+                    div.push('<li class="dp_month" data-month="' + month + '">' + months[month] + '</li>');
+                }
             }
         }
         
@@ -242,7 +245,14 @@ DatePicker.prototype.build = {
         
         // Build days
         for ( var i=1; i<=howManyDays; i++ ) {
-            days.push('<td class="dp_day dp_day_' + day + '">' + i + '</td>');
+            if(i == that.config.currentDay 
+                && that.config.selected.year == that.config.currentYear
+                && that.config.selected.month == that.config.currentMonth) {
+               days.push('<td class="dp_day dp_day_' + day + ' dp_current">' + i + '</td>');
+            }
+            else {
+                days.push('<td class="dp_day dp_day_' + day + ' ">' + i + '</td>');
+            }
             
             if ( 6 == day ) {
                 day = 0;
@@ -327,7 +337,7 @@ DatePicker.prototype.bind = {
         that.wrapper.on('click', '.dp_year', function() {
             var year = $(this).text();
             
-            that.insertTag('year', year);
+            that.insertTag('year', year, year);
             that.config.selected.year = year;
 
             // Build the months after picking a year
@@ -348,9 +358,10 @@ DatePicker.prototype.bind = {
         var that = dpObj;
         
         that.wrapper.on('click', '.dp_month', function() {
-            var month = $(this).text();
+            var month    = $(this).text(),
+                monthVal = $(this).data('month') + 1;
             
-            that.insertTag('month', month);
+            that.insertTag('month', month, monthVal);
             that.config.selected.month = $(this).data('month');
             
             // Build the days after picking a month
@@ -373,7 +384,7 @@ DatePicker.prototype.bind = {
         that.wrapper.on('click', '.dp_day', function() {
             var day = $(this).text();
             
-            that.insertTag('day', day);
+            that.insertTag('day', day, day);
             that.config.selected.day = day;
             
             that.updateHiddenInput();
@@ -489,35 +500,38 @@ DatePicker.prototype.bind = {
 DatePicker.prototype.updateHiddenInput = function() {
     var that  = this,
         tag   = that.wrapper.find('.dp_tag'),
-        value = '';
+        value = '',
+        order = that.config.order;
     
     that.input.val('');
     
-    tag.each(function(i) {
+    for ( var i=0; i<order.length; i++ ) {
         if ( i < 2 ) {
-            value += $(this).text() + that.config.spacer;
+            value += $('.dp_tag_' + order[i]).data('valuesubmitted') + that.config.spacer;
         } else {
-            value += $(this).text();
+            value += $('.dp_tag_' + order[i]).data('valuesubmitted');
         }
-    });
+        
+    }
     
     that.input.val(value);
 }
 
 /**
  * @param {string} type The type of tag it is. (year, month, day)
- * @param {string} value The value of the tag.
+ * @param {string} valueDisplayed The value of the tag.
+ * @param {string|number} valueSubmitted The value of the tag submitted.
  * @return {undefined}
  */
-DatePicker.prototype.insertTag = function(type, value) {
+DatePicker.prototype.insertTag = function(type, valueDisplayed, valueSubmitted) {
     var that   = this,
         tagBox = that.wrapper.find('.dp_tagBox'),
         tag    = tagBox.find('.dp_tag.dp_tag_' + type);
 
     if ( tag.size() > 0 ) {
-        tag.text(value);
+        tag.text(valueDisplayed);
     } else {
-        tagBox.prepend('<span class="dp_tag dp_tag_' + type + '">' + value + '</span>');
+        tagBox.prepend('<span class="dp_tag dp_tag_' + type + '" data-valuesubmitted="' + valueSubmitted + '">' + valueDisplayed + '</span>');
     }
 }
 
@@ -542,29 +556,6 @@ DatePicker.prototype.buildTagBox = function() {
  */
 DatePicker.prototype.hideInput = function() {
     this.input.hide();
-}
-
-/**
- * @param {string} month
- * 
- * return {Array} days
- */
-DatePicker.prototype.getMonth = function(month) {
-    return 'month';
-}
-
-/**
- * return {Array}
- */
-DatePicker.prototype.getYearList = function() {
-    var that  = this,
-        years = [];
-    
-    for ( var i=that.config.year.start; i<that.config.year.end + 1; i++) {
-        years.push(i);
-    }
-    
-    return years;
 }
 
 var datePicker = new DatePicker($('#datePicker'));
